@@ -2,39 +2,48 @@
   hosts: 192.168.209.8
   gather_facts: false
   vars:
-    previous_version: "12.1.1(tasmota)"
-    update_to: "12.2.0"
     update_url: "http://ota.tasmota.com/tasmota/release-{{update_to}}/tasmota-DE.bin.gz"
     afterupdate_version: "{{update_to}}(tasmota)"
-      #previous_version: "12.0.2(tasmota)"
-      #update_to: "12.1.1"
-      #
-      #previous_version: "9.3.1(tasmota)"
-      #update_to: "12.0.2"
-      #
-      #previous_version: "9.1.0(tasmota)"
-      #update_to: "9.3.1"
-      #
-      #previous_version: "8.5.1(tasmota)"
-      #update_to: "9.1.0"
-      #
-      #previous_version: "7.2.0(basic)"
-      #update_to: "8.5.1"
-      #
-      #previous_version: "12.3.1(tasmota)"
-      #update_to: "12.4.0"
-      #
-      #previous_version: "12.2.0(tasmota)"
-      #update_to: "12.3.1"
-      #
-      #previous_version: "12.1.1(tasmota)"
-      #update_to: "12.2.0"
+    use_update_set: 0
+    update_sets:
+      0:
+        current_version: "7.2.0(basic)"
+        update_to: "8.5.1"
+      1:
+        current_version: "8.5.1(tasmota)"
+        update_to: "9.1.0"
+      2:
+        current_version: "9.1.0(tasmota)"
+        update_to: "9.3.1"
+      3:
+        current_version: "9.3.1(tasmota)"
+        update_to: "12.0.2"
+      4:
+        current_version: "12.0.2(tasmota)"
+        update_to: "12.1.1"
+      5:
+        current_version: "12.1.1(tasmota)"
+        update_to: "12.2.0"
+      6:
+        current_version: "12.2.0(tasmota)"
+        update_to: "12.3.1"
+      7:
+        current_version: "12.3.1(tasmota)"
+        update_to: "12.4.0"
       #
       #afterupdate_version: "12.2.0(tasmota)"
       #update_url: "http://ota.tasmota.com/tasmota/release-12.2.0/tasmota-DE.bin.gz"
       #update_url: "http%3A%2F%2Fota.tasmota.com%2Ftasmota%2Frelease-12.2.0%2Ftasmota-DE.bin.gz"
 
   tasks:
+    - set_fact:
+        previous_version: "{{ update_sets[ use_update_set ].current_version }}"
+        update_to: "{{ update_sets[ use_update_set ].update_to }}"
+    - debug:
+        var: previous_version
+    - debug:
+        var: update_to
+
     - name: Retrieve JSON
       ansible.builtin.uri:
         url: "http://{{ inventory_hostname }}/cm?cmnd=status%202"

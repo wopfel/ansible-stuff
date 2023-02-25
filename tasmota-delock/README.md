@@ -44,13 +44,19 @@ Updates the firmware of a tasmota device.
 
 You have to explicitly specify the current version, and the version for the update.
 
-All version combinations in the yml file were tested and worked for me.
+All version combinations in the yml file were tested and worked for me. These are pre-defined as a dict (`update_sets`).
 
-Example. To update a device from 8.5.1 to 9.1.0:
+Example. To update a device from 8.5.1 to 9.1.0 set `use_update_set` to `1`:
 
 ```yaml
-      previous_version: "8.5.1(tasmota)"
-      update_to: "9.1.0"
+    use_update_set: 1
+    update_sets:
+      0:
+        current_version: "7.2.0(basic)"
+        update_to: "8.5.1"
+      1:
+        current_version: "8.5.1(tasmota)"
+        update_to: "9.1.0"
 ```
 
 Sample output:
