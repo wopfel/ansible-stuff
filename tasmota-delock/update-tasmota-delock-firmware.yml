@@ -50,36 +50,34 @@
     - debug:
         var: firmware_version
 
-    - name: Fail if firmware mismatch
-      assert:
-        that:
-          - 'previous_version == firmware_version'
+    - name: End the play for a device when already at new version
+      ansible.builtin.meta: end_host
+      when:
+      - firmware_version == afterupdate_version
 
-    - debug:
-        var: update_url
+    - block:
 
-    - debug:
-        msg: "{{ update_url | urlencode() }}"
+        - name: Start firmware update
+          ansible.builtin.uri:
+            url: "http://{{ inventory_hostname }}/u1?o={{ update_url | urlencode }}"
+            method: GET
+            headers:
+              Referer: "http://{{ inventory_hostname }}/up?"
+          delegate_to: localhost
 
-    - name: Start firmware update
-      ansible.builtin.uri:
-        url: "http://{{ inventory_hostname }}/u1?o={{ update_url | urlencode }}"
-        method: GET
-        headers:
-          Referer: "http://{{ inventory_hostname }}/up?"
-      delegate_to: localhost
+        - name: Pause
+          ansible.builtin.pause:
+            seconds: 10
 
-    - name: Pause
-      ansible.builtin.pause:
-        seconds: 10
+        - name: Retrieve JSON
+          ansible.builtin.uri:
+            url: "http://{{ inventory_hostname }}/cm?cmnd=status%202"
+          register: jsonout_afterupdate
+          delegate_to: localhost
+          until: (jsonout_afterupdate.failed is false) and (jsonout_afterupdate.status == 200) and (jsonout_afterupdate.json.StatusFWR.Version is defined) and (jsonout_afterupdate.json.StatusFWR.Version == afterupdate_version)
+          retries: 6
+          delay: 10
 
-    - name: Retrieve JSON
-      ansible.builtin.uri:
-        url: "http://{{ inventory_hostname }}/cm?cmnd=status%202"
-      register: jsonout_afterupdate
-      delegate_to: localhost
-      until: (jsonout_afterupdate.failed is false) and (jsonout_afterupdate.status == 200) and (jsonout_afterupdate.json.StatusFWR.Version is defined) and (jsonout_afterupdate.json.StatusFWR.Version == afterupdate_version)
-      retries: 6
-      delay: 10
+        - debug: var=jsonout_afterupdate
 
-    - debug: var=jsonout_afterupdate
+      when: previous_version == firmware_version
