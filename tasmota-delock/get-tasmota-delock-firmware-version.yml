@@ -1,0 +1,19 @@
+- name: Get tasmota version of Delock device
+  hosts: delocks
+  gather_facts: false
+
+  tasks:
+    - name: Retrieve JSON
+      ansible.builtin.uri:
+        url: "http://{{ inventory_hostname }}/cm?cmnd=status%202"
+      register: jsonout
+      delegate_to: localhost
+
+    - debug:
+        var: jsonout
+
+    - set_fact:
+        firmware_version: "{{ jsonout.json.StatusFWR.Version }}"
+
+    - debug:
+        var: firmware_version
