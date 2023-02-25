@@ -64,6 +64,8 @@
             headers:
               Referer: "http://{{ inventory_hostname }}/up?"
           delegate_to: localhost
+          changed_when: uriupdate.status == 200
+          register: uriupdate
 
         - name: Pause
           ansible.builtin.pause:
