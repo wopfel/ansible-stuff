@@ -1,0 +1,85 @@
+- name: Update tasmota firmware of Delock device
+  hosts: 192.168.209.8
+  gather_facts: false
+  vars:
+    previous_version: "12.1.1(tasmota)"
+    update_to: "12.2.0"
+    update_url: "http://ota.tasmota.com/tasmota/release-{{update_to}}/tasmota-DE.bin.gz"
+    afterupdate_version: "{{update_to}}(tasmota)"
+      #previous_version: "12.0.2(tasmota)"
+      #update_to: "12.1.1"
+      #
+      #previous_version: "9.3.1(tasmota)"
+      #update_to: "12.0.2"
+      #
+      #previous_version: "9.1.0(tasmota)"
+      #update_to: "9.3.1"
+      #
+      #previous_version: "8.5.1(tasmota)"
+      #update_to: "9.1.0"
+      #
+      #previous_version: "7.2.0(basic)"
+      #update_to: "8.5.1"
+      #
+      #previous_version: "12.3.1(tasmota)"
+      #update_to: "12.4.0"
+      #
+      #previous_version: "12.2.0(tasmota)"
+      #update_to: "12.3.1"
+      #
+      #previous_version: "12.1.1(tasmota)"
+      #update_to: "12.2.0"
+      #
+      #afterupdate_version: "12.2.0(tasmota)"
+      #update_url: "http://ota.tasmota.com/tasmota/release-12.2.0/tasmota-DE.bin.gz"
+      #update_url: "http%3A%2F%2Fota.tasmota.com%2Ftasmota%2Frelease-12.2.0%2Ftasmota-DE.bin.gz"
+
+  tasks:
+    - name: Retrieve JSON
+      ansible.builtin.uri:
+        url: "http://{{ inventory_hostname }}/cm?cmnd=status%202"
+      register: jsonout
+      delegate_to: localhost
+
+    - debug:
+        var: jsonout
+
+    - set_fact:
+        firmware_version: "{{ jsonout.json.StatusFWR.Version }}"
+
+    - debug:
+        var: firmware_version
+
+    - name: Fail if firmware mismatch
+      assert:
+        that:
+          - 'previous_version == firmware_version'
+
+    - debug:
+        var: update_url
+
+    - debug:
+        msg: "{{ update_url | urlencode() }}"
+
+    - name: Start firmware update
+      ansible.builtin.uri:
+        url: "http://{{ inventory_hostname }}/u1?o={{ update_url | urlencode }}"
+        method: GET
+        headers:
+          Referer: "http://{{ inventory_hostname }}/up?"
+      delegate_to: localhost
+
+    - name: Pause
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Retrieve JSON
+      ansible.builtin.uri:
+        url: "http://{{ inventory_hostname }}/cm?cmnd=status%202"
+      register: jsonout_afterupdate
+      delegate_to: localhost
+      until: (jsonout_afterupdate.failed is false) and (jsonout_afterupdate.status == 200) and (jsonout_afterupdate.json.StatusFWR.Version is defined) and (jsonout_afterupdate.json.StatusFWR.Version == afterupdate_version)
+      retries: 6
+      delay: 10
+
+    - debug: var=jsonout_afterupdate

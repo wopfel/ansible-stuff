@@ -36,3 +36,19 @@ ok: [192.168.209.8] => {
     "firmware_version": "12.2.0(tasmota)"
 }
 ```
+
+
+## update-tasmota-delock-firmware.yml
+
+Updates the firmware of a tasmota device.
+
+You have to explicitly specify the current version, and the version for the update.
+
+All version combinations in the yml file were tested and worked for me.
+
+Example. To update a device from 8.5.1 to 9.1.0:
+
+```yaml
+      previous_version: "8.5.1(tasmota)"
+      update_to: "9.1.0"
+```
