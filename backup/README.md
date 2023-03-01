@@ -27,3 +27,8 @@ I have a separate server where proxmox backup is installed. Running vzdump, a du
 ### vzdump-one-by-one-proxmox.yml
 
 The playbook fetches all IDs from both proxmox VE servers (proxmox3, and proxmox4 in my environment).
+
+
+## Borg
+
+Old files. Put in separate folder. Not used anymore.
