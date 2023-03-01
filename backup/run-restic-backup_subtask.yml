@@ -1,0 +1,40 @@
+---
+  - name: Backup block
+    block:
+      - name: MQTT publish pre-backup
+        mqtt:
+          topic: 'backup/restic/{{backupsrv}}/{{ ansible_hostname }}'
+          payload: 'starting backup {{ ansible_date_time.date }} {{ ansible_date_time.time }}'
+          server: mosquitto.lan
+          retain: yes
+        delegate_to: localhost
+
+      - name: 'Run backup of {{ ansible_hostname }} on {{backupsrv}}'
+        command: '/usr/local/bin/run-restic-backup {{backupsrv}}'
+        register: resticcmd
+
+      - name: MQTT publish on end
+        mqtt:
+          topic: 'backup/restic/{{backupsrv}}/{{ ansible_hostname }}'
+          payload: 'finished with returncode {{ resticcmd.rc }} on {{ resticcmd.end }}'
+          server: mosquitto.lan
+          retain: yes
+        delegate_to: localhost
+
+      - name: MQTT publish on success
+        mqtt:
+          topic: 'backup/restic/{{backupsrv}}/{{ ansible_hostname }}/last_success'
+          payload: '{{ resticcmd.end }}'
+          server: mosquitto.lan
+          retain: yes
+        delegate_to: localhost
+        when: resticcmd.rc == 0
+
+    always:
+      - name: MQTT publish rc
+        mqtt:
+          topic: 'backup/restic/{{backupsrv}}/{{ ansible_hostname }}/last_returncode'
+          payload: '{{ resticcmd.rc }}'
+          server: mosquitto.lan
+          retain: yes
+        delegate_to: localhost

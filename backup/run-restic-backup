@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Restic backup script
+# Distributed using Ansible
+
+DESTINATIONHOST=$1
+
+if [[ -z $DESTINATIONHOST ]]; then
+	echo "Error: DESTINATIONHOST is undefined."
+	exit 1
+fi
+if ! [[ $DESTINATIONHOST =~ backup[45]\.lan ]]; then
+	echo "Error: Wrong DESTINATIONHOST."
+	exit 1
+fi
+
+LOGFILE=/var/log/restic-backup_${DESTINATIONHOST}.log
+
+EXCLUDE=""
+if [[ $(hostname -s) = "lrbackup" ]]; then
+        EXCLUDE="--exclude /media/LightroomBackup0/current --exclude /media/LightroomBackup0/snapshots*"
+fi
+
+# Some other hosts (removed from the public script)
+
+if [[ $(hostname -s) = database* || $(hostname -s) = db* ]]; then
+        EXCLUDE="--exclude /var/lib/mysql/*"
+fi
+
+# copy all output to logfile
+# Source: https://thomas-leister.de/server-backups-mit-borg/
+exec > >(tee -i ${LOGFILE})
+exec 2>&1
+
+# Turn off globbing
+set -f
+
+export RESTIC_PASSWORD=PutYourResticPasswordHere
+
+# SSH destination port
+DESTPORT=22
+
+# External hosted servers
+# Some tricky stuff using SSH tunnel
+if [[ $(hostname -s) = NAME1 || $(hostname -s) = NAME2 ]]; then
+	DESTINATIONHOST=127.0.0.1
+	if [[ $DESTINATIONHOST = backup4.lan ]]; then
+		DESTPORT=33334
+	fi
+	if [[ $DESTINATIONHOST = backup5.lan ]]; then
+		DESTPORT=33335
+	fi
+fi
+
+restic -o sftp.command="ssh -p $DESTPORT -o BatchMode=yes -i /root/id_rsa_restic resticbkp@$DESTINATIONHOST -s sftp" \
+	--repo "sftp:sshhost:/media/backup1/$(hostname)/" \
+	--exclude "/var/cache/pacman/pkg/" \
+	--exclude "/var/cache/apt/archives/" \
+	--exclude "/var/log/journal/" \
+	--exclude "/media/backup*" \
+	--exclude "/media/Backup*" \
+	--exclude "/home/*/.cache/" \
+	--exclude "/root/.cache/" \
+	--exclude "/root/.ansible/tmp/" \
+	$EXCLUDE \
+	--exclude "/sys" \
+	--exclude "/dev" \
+	--exclude "/tmp" \
+	--exclude "/proc" \
+	--exclude "/run" \
+        --exclude "/var/lib/dhcpcd/dev/" \
+        --exclude "/var/lib/dhcpcd/proc/" \
+        --exclude "/var/lib/dhcpcd/run/" \
+        --exclude "/var/lib/dhcpcd/sys/" \
+	backup  /

@@ -1,0 +1,38 @@
+---
+- name: Run restic backup
+  hosts: "{{ target }}"
+  #gather_facts: False
+  serial:
+  - 3
+
+  tasks:
+  - name: Get directory stats
+    stat:
+      path: "/media/backup1/{{ ansible_hostname }}"
+    register: stat_result
+    delegate_to: "{{item}}"
+    with_items:
+    - "backup4.lan"
+    - "backup5.lan"
+
+  - name: Ensure backup partition is mounted
+    assert:
+      that:
+        - item.stat.isdir is defined
+        - item.stat.isdir
+    with_items: "{{stat_result.results }}"
+
+  - name: Transfer backup script
+    copy:
+      src: ../files/run-restic-backup
+      dest: /usr/local/bin/run-restic-backup
+      owner: root
+      mode: 0544
+
+  - name: Run backup
+    include_tasks: run-restic-backup_subtask.yml
+    vars:
+      backupsrv: "{{item}}"
+    with_items:
+    - "backup4.lan"
+    - "backup5.lan"

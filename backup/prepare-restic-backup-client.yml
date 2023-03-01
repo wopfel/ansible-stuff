@@ -1,0 +1,124 @@
+---
+- name: Prepare mount point
+  hosts: backup4.lan,backup5.lan
+
+  tasks:
+    - name: Assert disk is mounted
+      assert:
+        that: "mount.fstype == 'btrfs'"
+        msg: Backup dir /media/backup1 is not mounted
+      vars:
+        mount: "{{ ansible_mounts | selectattr('mount','equalto','/media/backup1') | list | first }}"
+
+    - name: Set permissions
+      file:
+        path: /media/backup1
+        state: directory
+        owner: resticbkp
+        group: resticbkp
+
+- name: Prepare restic backup
+  hosts: testct4.lan,testct5.lan
+
+  tasks:
+    - name: Create ssh key
+      openssh_keypair:
+        path: /root/id_rsa_restic
+        comment: Restic key from {{ inventory_hostname_short }} created by Ansible
+
+    - name: Update pacman cache
+      pacman:
+        update_cache: yes
+      when: ansible_facts['os_family'] == 'Archlinux'
+
+    - name: Install packages (Arch Linux)
+      pacman:
+        name: restic
+        state: present
+      when: ansible_facts['os_family'] == 'Archlinux'
+
+    - name: Install packages (Debian/Ubuntu)
+      apt:
+        name: "{{ packages }}"
+      vars:
+        packages:
+        - restic
+      when: ansible_facts['os_family'] == 'Debian'
+
+    - name: Fetch public key
+      shell: cat /root/id_rsa_restic.pub
+      register: ssh_keys
+      changed_when: False
+
+    - name: Print keys
+      debug: msg="{{ ssh_keys.stdout }}"
+
+    - name: Set keys on backup4
+      delegate_to: backup4.lan
+      authorized_key:
+        user: resticbkp
+        key: "{{ item }}"
+        # VON BORG KOPIERT: key_options: 'command="restic serve --restrict-to-path /media/backup1/{{ inventory_hostname_short }} --append-only"'
+      loop:
+        - "{{ ssh_keys.stdout }}"
+
+    - name: Set keys on backup5
+      delegate_to: backup5.lan
+      authorized_key:
+        user: resticbkp
+        key: "{{ item }}"
+        # VON BORG KOPIERT: key_options: 'command="restic serve --restrict-to-path /media/backup1/{{ inventory_hostname_short }} --append-only"'
+      loop:
+        - "{{ ssh_keys.stdout }}"
+
+    - name: Create btrfs subvolume on backup4
+      delegate_to: backup4.lan
+      command: /usr/bin/btrfs subvolume create /media/backup1/{{ inventory_hostname_short }}
+      become: yes
+      become_user: resticbkp
+      args:
+        creates: /media/backup1/{{ inventory_hostname_short }}/
+
+    - name: Create btrfs subvolume on backup5
+      delegate_to: backup5.lan
+      command: /usr/bin/btrfs subvolume create /media/backup1/{{ inventory_hostname_short }}
+      become: yes
+      become_user: resticbkp
+      args:
+        creates: /media/backup1/{{ inventory_hostname_short }}/
+
+    - name: Init restic repository on backup4
+      delegate_to: backup4.lan
+      shell: /usr/bin/restic init --repo /media/backup1/{{ inventory_hostname_short }}/
+      become: yes
+      become_user: resticbkp
+      environment:
+        RESTIC_PASSWORD: "PutYourResticPasswordHere"
+      args:
+        creates: /media/backup1/{{ inventory_hostname_short }}/config
+
+    - name: Init restic repository on backup5
+      delegate_to: backup5.lan
+      shell: /usr/bin/restic init --repo /media/backup1/{{ inventory_hostname_short }}/
+      become: yes
+      become_user: resticbkp
+      environment:
+        RESTIC_PASSWORD: "PutYourResticPasswordHere"
+      args:
+        creates: /media/backup1/{{ inventory_hostname_short }}/config
+
+    - name: Transfer backup script
+      copy:
+        src: ../files/run-restic-backup
+        dest: /usr/local/bin/run-restic-backup
+        owner: root
+        mode: 0544
+
+    - name: The backup server should be well known
+      known_hosts:
+        path: /root/.ssh/known_hosts
+        name: "{{ item.name }}"
+        key: "{{ item.key }}"
+      loop:
+        - { name: "backup4.lan", key: "backup4.lan,IPADRESS ecdsa-sha2-nistp256 KEY1" }
+        - { name: "backup5.lan", key: "backup5.lan,IPADRESS ecdsa-sha2-nistp256 KEY2" }
