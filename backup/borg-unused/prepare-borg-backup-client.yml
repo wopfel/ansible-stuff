@@ -1,0 +1,82 @@
+---
+- name: Prepare borg backup
+  hosts: PUT_YOUR_HOSTS_HERE
+
+  tasks:
+    - name: Create ssh key
+      openssh_keypair:
+        path: /root/id_rsa_borg
+        comment: Borg key from {{ inventory_hostname_short }} created by Ansible
+
+    - name: Update pacman cache
+      pacman:
+        update_cache: yes
+      when: ansible_facts['os_family'] == 'Archlinux'
+
+    - name: Install packages (Arch Linux)
+      pacman:
+        name: borg
+        state: present
+      when: ansible_facts['os_family'] == 'Archlinux'
+
+    - name: Install packages (Debian/Ubuntu)
+      apt:
+        name: "{{ packages }}"
+      vars:
+        packages:
+        - borgbackup
+      when: ansible_facts['os_family'] == 'Debian'
+
+    - name: Fetch public key
+      shell: cat /root/id_rsa_borg.pub
+      register: ssh_keys
+      changed_when: False
+
+    - name: Print keys
+      debug: msg="{{ ssh_keys.stdout }}"
+
+    - name: Set keys
+      delegate_to: backup3.lan
+      authorized_key:
+        user: borgbkp
+        key: "{{ item }}"
+        key_options: 'command="borg serve --restrict-to-path /media/backup0/{{ inventory_hostname_short }} --append-only"'
+      loop:
+        - "{{ ssh_keys.stdout }}"
+
+    - name: Create btrfs subvolume
+      delegate_to: backup3.lan
+      command: /usr/bin/btrfs subvolume create /media/backup0/{{ inventory_hostname_short }}
+      become: yes
+      become_user: borgbkp
+      args:
+        creates: /media/backup0/{{ inventory_hostname_short }}/
+
+    - name: Init borg repository
+      delegate_to: backup3.lan
+      command: /usr/bin/borg init --encryption=none /media/backup0/{{ inventory_hostname_short }}
+      become: yes
+      become_user: borgbkp
+      args:
+        creates: /media/backup0/{{ inventory_hostname_short }}/config
+
+    - name: Transfer backup script
+      copy:
+        src: ../files/run-borg-backup
+        dest: /usr/local/bin/run-borg-backup
+        owner: root
+        mode: 0544
+
+    - name: The backup server should be well known
+      known_hosts:
+        path: /root/.ssh/known_hosts
+        name: "{{ item.name }}"
+        key: "{{ item.key }}"
+      loop:
+        - { name: "IPADDRESS", key: "IPADDRESS ecdsa-sha2-nistp256 PUT_KEY_HERE" }
+        - { name: "backup3.lan", key: "backup3.lan,IPADDRESS ecdsa-sha2-nistp256 PUT_KEY_HERE" }
+
+        # BORG_RSH="ssh -i /root/id_rsa_borg" borg create -v --stats --progress --compression lz4 --one-file-system  --exclude "/var/cache/pacman/pkg/*"  ssh://borgbkp@backup3.lan/media/backup0/$(hostname)::'{now:%Y-%m-%d_%H:%M}'  /
+
+        # Run backup if directory doesn't exist?
+        # /root/.config/borg/security/

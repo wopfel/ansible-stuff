@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Borg backup script
+# Distributed using Ansible
+
+export BORG_RSH="ssh -i /root/id_rsa_borg"
+LOGFILE=/var/log/borg-backup.log
+
+# Skips the question on first run (when no logfile exists)
+# Warning: Attempting to access a previously unknown unencrypted repository!
+# Do you want to continue? [yN] n
+if [[ ! -f $LOGFILE ]] ; then
+	    export BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=yes
+fi
+
+# Compression festlegen
+COMPRESSION=lz4
+if [[ $(hostname -s) = alarmpi-* ]]; then
+	COMPRESSION=none
+fi
+
+EXCLUDE=""
+
+if [[ $(hostname -s) = "backup4" ]]; then
+        EXCLUDE="--exclude /media/backup*"
+fi
+
+# Some other host specific settings
+# ...
+
+if [[ $(hostname -s) = database* || $(hostname -s) = db* ]]; then
+        EXCLUDE="--exclude /var/lib/mysql/*"
+fi
+
+# copy all output to logfile
+# Source: https://thomas-leister.de/server-backups-mit-borg/
+exec > >(tee -i ${LOGFILE})
+exec 2>&1
+
+# Turn off globbing
+set -f
+
+borg create -v --stats --progress --compression $COMPRESSION \
+            --exclude "/var/cache/pacman/pkg/" \
+            --exclude "/var/cache/apt/archives/" \
+            --exclude "/var/log/journal/" \
+            --exclude "/media/backup*" \
+            --exclude "/media/Backup*" \
+            --exclude "/home/*/.cache/" \
+	    $EXCLUDE \
+            --exclude "/sys" \
+            --exclude "/dev" \
+            --exclude "/tmp" \
+            --exclude "/proc" \
+            --exclude "/run" \
+            --exclude "/var/lib/dhcpcd/dev/" \
+            --exclude "/var/lib/dhcpcd/proc/" \
+            --exclude "/var/lib/dhcpcd/run/" \
+            --exclude "/var/lib/dhcpcd/sys/" \
+            ssh://borgbkp@backup3.lan/media/backup0/$(hostname)::'{now:%Y-%m-%d_%H:%M}' \
+            /

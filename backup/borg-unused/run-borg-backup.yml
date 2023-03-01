@@ -1,0 +1,55 @@
+---
+- name: Run borg backup
+  hosts: "{{ target }}"
+  #gather_facts: False
+  #serial:
+  #- 2
+
+  tasks:
+    - name: Check directory
+      stat:
+        path: "/media/backup0/{{ ansible_hostname }}"
+      register: stat_result
+      delegate_to: backup3.lan
+
+    - name: Ensure backup partition is mounted
+      assert:
+        that:
+          - stat_result.stat.isdir is defined
+          - stat_result.stat.isdir
+
+    - name: Transfer backup script
+      copy:
+        src: ../files/run-borg-backup
+        dest: /usr/local/bin/run-borg-backup
+        owner: root
+        mode: 0544
+
+    - name: MQTT publish
+      mqtt:
+        topic: 'backup/borg/backup3.lan/{{ ansible_hostname }}'
+        payload: 'starting backup {{ ansible_date_time.date }} {{ ansible_date_time.time }}'
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+
+    - name: Run backup
+      command: /usr/local/bin/run-borg-backup
+      register: borgcmd
+
+    - name: MQTT publish
+      mqtt:
+        topic: 'backup/borg/backup3.lan/{{ ansible_hostname }}'
+        payload: 'finished with returncode {{ borgcmd.rc }} on {{ borgcmd.end }}'
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+
+    - name: MQTT publish on success
+      mqtt:
+        topic: 'backup/borg/backup3.lan/{{ ansible_hostname }}/last_success'
+        payload: '{{ borgcmd.end }}'
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+      when: borgcmd.rc == 0
