@@ -1,5 +1,5 @@
 ---
-- hosts: proxmox3.lan,proxmox4.lan
+- hosts: proxmox*.lan
   tasks:
     - name: List Qemu VMs
       command: "pvesh ls /nodes/{{ ansible_hostname }}/qemu --output-format json"
