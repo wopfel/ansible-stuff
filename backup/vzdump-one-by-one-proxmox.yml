@@ -35,3 +35,34 @@
       loop: "{{ vzdumpoutput.results }}"
       loop_control:
         label: "{{ item.item }}"
+
+    - name: MQTT publish full output
+      mqtt:
+        topic: 'backup/vzdump/{{ansible_hostname}}/{{item.item}}/full_output'
+        payload: '{{ item | to_json }}'
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+      loop: "{{ vzdumpoutput.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+    - name: MQTT publish last stdout line
+      mqtt:
+        topic: 'backup/vzdump/{{ansible_hostname}}/{{item.item}}/last_stdout_line'
+        payload: '{{ item.stdout_lines | last }}'
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+      loop: "{{ vzdumpoutput.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+    - name: MQTT publish last returncode
+      mqtt:
+        topic: 'backup/vzdump/{{ansible_hostname}}/{{item.item}}/last_returncode'
+        payload: '{{ item.rc }}'
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+      loop: "{{ vzdumpoutput.results }}"
+      loop_control:
+        label: "{{ item.item }}"
