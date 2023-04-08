@@ -1,0 +1,45 @@
+---
+- name: Start backup servers
+  hosts: localhost
+
+  tasks:
+    - name: Wake servers
+      community.general.wakeonlan:
+        mac: "{{ item }}"
+      delegate_to: localhost
+      loop:
+        - th:em:ac:ad:dr:es
+
+    - name: Wait for servers to come up
+      wait_for:
+        host: "{{ item }}"
+        port: 22
+        timeout: 180
+      loop:
+        - backup3.lan
+
+- name: Mount/wait for backup partitions
+  hosts: backup3.lan
+
+  tasks:
+    - name: Unlock
+      community.crypto.luks_device:
+        device: "/dev/disk/by-id/diskname-part1"
+        name: crypt
+        state: opened
+        passphrase: 'passphrase-for-luks'
+
+    - name: Mount crypt partition
+      mount:
+        path: /media/backupstg
+        src: /dev/mapper/crypt
+        state: mounted
+        fstype: ext4
+        fstab: /tmp/tmp.fstab
+
+    - name: Wait until partition is mounted
+      shell: mountpoint -q /media/backupstg
+      register: result
+      until: result.rc == 0
+      retries: 40
+      delay: 5

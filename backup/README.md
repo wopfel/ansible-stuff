@@ -24,6 +24,12 @@ When I create new Linux containers, or VMs, I ran this playbook to setup the bac
 
 I have a separate server where proxmox backup is installed. Running vzdump, a dump of each Linux container, and VM can be created and stored on the PBS.
 
+### start-proxmox-backup-server.yml
+
+This will wake my backup server, and mount the encrypted partition where the backups are stored.
+
+After the server is up, I start `vzdump-one-by-one-proxmox.yml`.
+
 ### vzdump-one-by-one-proxmox.yml
 
 The playbook fetches all IDs from both proxmox VE servers (proxmox3, and proxmox4 in my environment).
