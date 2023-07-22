@@ -42,9 +42,9 @@ ok: [192.168.209.8] => {
 
 Updates the firmware of a tasmota device.
 
-You have to explicitly specify the current version, and the version for the update.
+You have to explicitly specify the current version, and the target version for the update.
 
-All version combinations in the yml file were tested and worked for me. These are pre-defined as a dict (`update_sets`).
+All version combinations in the yml file were tested and worked for me(TM). These are pre-defined as a dict (`update_sets`).
 
 Example. To update a device from 8.5.1 to 9.1.0 set `use_update_set` to `1`:
 
