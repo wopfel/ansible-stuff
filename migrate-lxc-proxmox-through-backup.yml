@@ -1,0 +1,61 @@
+- hosts: localhost
+  vars:
+    lxcid: 518
+    deststg: vms2
+    fromhost: proxmox1.lan
+    tohost: proxmox2.lan
+      #deststg: local-lvm
+  tasks:
+    - name: "Query config {{ lxcid }}"
+      shell: "pct config {{ lxcid }}"
+      register: configresult
+      delegate_to: "{{ fromhost }}"
+
+    - name: "Stop container {{ lxcid }}"
+      shell: "pct stop {{ lxcid }}"
+      delegate_to: "{{ fromhost }}"
+
+    - name: Backup container
+      shell: "vzdump {{ lxcid }} --storage store2 --mode snapshot --node {{ ansible_host | split('.') | first }}"
+      register: bkpresult
+      failed_when: "'INFO: Backup job finished successfully' not in bkpresult.stdout"
+      delegate_to: "{{ fromhost }}"
+
+    - debug:
+        msg: "{{ bkpresult }}"
+
+    # INFO: Starting backup: ct/500/2023-06-21T05:35:02Z
+    # regex_search erweitern um: ", multiline=True" ?
+    - set_fact:
+        destdir: "{{ bkpresult.stdout | regex_search(regexp,'\\1') | first }}"
+      vars:
+        regexp: 'INFO: Starting backup: (ct......*)'
+    - debug:
+        var: destdir
+
+    - name: Restore container
+      shell: "pct restore {{ lxcid }} store2:backup/{{ destdir }} --storage {{ deststg }}"
+      register: restoreresult
+      delegate_to: "{{ tohost }}"
+
+    - name: Start container
+      shell: "pct start {{ lxcid }}"
+      delegate_to: "{{ tohost }}"
+
+
+          #- set_fact:
+          #destdir: "{{ item | regex_search(regexp,'\\1') }}"
+          #when: "'INFO: Starting backup:' in item"
+          #with_items:
+          #- "{{ bkpresult.stdout_lines }}"
+          #vars:
+          #regexp: 'INFO: Starting backup: (ct......*)'
+          #- debug:
+          #var: destdir
+
+
+          #- hosts: proxmox*.lan
+          #vars:
+          #destinationstore: store2
+      # store1 = backup3.lan
+      # store2 = backup7.lan
