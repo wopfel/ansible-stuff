@@ -1,4 +1,14 @@
----
+- hosts: backup3.lan,backup7.lan
+  tasks:
+    - name: Wait until partition is mounted
+      shell: mountpoint -q /media/backupstg
+      register: result
+      until: result.rc == 0
+      retries: 40
+      delay: 5
+    - debug:
+        msg: "{{ result }}"
+
 - hosts: proxmox*.lan
   tasks:
     - name: List Qemu VMs
