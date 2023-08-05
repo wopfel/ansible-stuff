@@ -30,6 +30,12 @@
       7:
         current_version: "12.3.1(tasmota)"
         update_to: "12.4.0"
+      8:
+        current_version: "12.4.0(tasmota)"
+        update_to: "12.5.0"
+      9:
+        current_version: "12.5.0(tasmota)"
+        update_to: "13.0.0"
       #
       #afterupdate_version: "12.2.0(tasmota)"
       #update_url: "http://ota.tasmota.com/tasmota/release-12.2.0/tasmota-DE.bin.gz"
