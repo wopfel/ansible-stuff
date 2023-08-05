@@ -76,6 +76,9 @@
           changed_when: uriupdate.status == 200
           register: uriupdate
 
+        - debug:
+            var: uriupdate
+
         - name: Pause
           ansible.builtin.pause:
             seconds: 10
