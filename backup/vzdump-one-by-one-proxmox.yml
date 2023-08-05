@@ -10,6 +10,10 @@
         msg: "{{ result }}"
 
 - hosts: proxmox*.lan
+  vars:
+    destinationstore: store1
+      # store1 = backup3.lan
+      # store2 = backup7.lan
   tasks:
     - name: List Qemu VMs
       command: "pvesh ls /nodes/{{ ansible_hostname }}/qemu --output-format json"
@@ -36,8 +40,8 @@
     - debug:
         msg: "{{ all_id_list }}"
 
-    - name: Run vzdump backup
-      command: "vzdump {{ item }} --mailnotification always --storage store1 --mode snapshot --node {{ ansible_hostname }}"
+    - name: "Run vzdump backup to {{ destinationstore }}"
+      command: "vzdump {{ item }} --mailnotification always --storage {{ destinationstore }} --mode snapshot --node {{ ansible_hostname }}"
       register: vzdumpoutput
       loop: "{{ all_id_list }}"
     - debug:
@@ -76,3 +80,4 @@
       loop: "{{ vzdumpoutput.results }}"
       loop_control:
         label: "{{ item.item }}"
+
