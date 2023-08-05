@@ -34,6 +34,8 @@ After the server is up, I start `vzdump-one-by-one-proxmox.yml`.
 
 The playbook fetches all IDs from both proxmox VE servers (proxmox3, and proxmox4 in my environment).
 
+Start the backup by running `ansible-playbook vzdump-one-by-one-proxmox.yml --extra-vars "bkpserver=backup7.lan"`.
+
 
 ## Borg
 

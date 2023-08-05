@@ -1,4 +1,5 @@
-- hosts: backup3.lan,backup7.lan
+- hosts: "{{ bkpserver }}"
+  #- hosts: backup3.lan,backup7.lan
   tasks:
     - name: Wait until partition is mounted
       shell: mountpoint -q /media/backupstg
@@ -11,10 +12,17 @@
 
 - hosts: proxmox*.lan
   vars:
-    destinationstore: store1
+    destinationstores:
+      backup3.lan: store1
+      backup7.lan: store2
+        #destinationstore: store1
       # store1 = backup3.lan
       # store2 = backup7.lan
   tasks:
+    - set_fact:
+        destinationstore: "{{ destinationstores[ bkpserver ] }}"
+    - debug:
+        var: destinationstore
     - name: List Qemu VMs
       command: "pvesh ls /nodes/{{ ansible_hostname }}/qemu --output-format json"
       register: qemujson
