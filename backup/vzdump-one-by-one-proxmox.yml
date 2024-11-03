@@ -36,6 +36,7 @@
     - name: List containers
       command: "pvesh ls /nodes/{{ ansible_hostname }}/lxc --output-format json"
       register: lxcjson
+      changed_when: false
     - set_fact:
         lxc_id_list: "{{ lxcjson.stdout | from_json | json_query(idquery) }}"
       vars:
