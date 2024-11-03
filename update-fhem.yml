@@ -1,0 +1,155 @@
+- hosts: fhem.lan
+  tasks:
+    - name: Fhem call, grab csrf token
+      delegate_to: localhost
+      uri:
+        url: "http://{{ ansible_fqdn }}:8083"
+        method: GET
+        body_format: json
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      register: uricall
+    - debug:
+        msg: "{{ uricall }}"
+
+    # Gibt zurueck: "csrf_571307826093724"
+    - debug:
+        msg: "{{ uricall.x_fhem_csrftoken }}"
+
+    ###
+    ### Check for updates
+    ###
+
+    - name: Fhem call, check update
+      delegate_to: localhost
+      uri:
+        url: "http://{{ ansible_fqdn }}:8083/fhem?cmd=update%20check&XHR=1&fwcsrf={{ csrftoken }}"
+        method: GET
+        body_format: json
+        return_content: yes
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      vars:
+        csrftoken: "{{ uricall.x_fhem_csrftoken }}"
+      register: fhemupdatecheckresult
+
+    - debug:
+        msg: "{{ fhemupdatecheckresult }}"
+
+    # "content": "\nDownloading https://fhem.de/fhemupdate/controls_fhem.txt\nnothing to do...\n\n",
+
+    - name: End the play for a host when nothing to do
+      ansible.builtin.meta: end_host
+      when:
+      - fhemupdatecheckresult.content | regex_search('Downloading https://fhem\.de/fhemupdate/controls_fhem\.txt\nnothing to do\.\.\.', multiline=True)
+
+      #- name: Fail
+      #assert:
+      #  that:
+      #    - '1 == 2'
+
+    ###
+    ### Prepare udpate
+    ###
+
+    - name: Fhem call, save config
+      delegate_to: localhost
+      uri:
+        url: "http://{{ ansible_fqdn }}:8083/fhem?cmd=save&XHR=1&fwcsrf={{ csrftoken }}"
+        method: GET
+        body_format: json
+        return_content: yes
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      vars:
+        csrftoken: "{{ uricall.x_fhem_csrftoken }}"
+      register: fhemcmd
+
+    - debug:
+        msg: "{{ fhemcmd }}"
+
+    - name: Fail if save failed
+      assert:
+        that:
+          - '"Wrote configuration to /usr/local/fhem/fhem.cfg\n" == fhemcmd.content'
+
+    ###
+    ### Log message
+    ###
+
+    # I've experienced a never ending 'wait for match' sometimes, maybe because / and/or + were appeared in the string
+    # Removed "base64=True"
+
+    - name: Generate random string
+      set_fact:
+        randombase64: "{{ lookup( 'community.general.random_string', length=32, special=false) }}"
+
+    - name: Fhem call
+      delegate_to: localhost
+      uri:
+        url: "http://{{ ansible_fqdn }}:8083/fhem?cmd={{ cmd }}&XHR=1&fwcsrf={{ csrftoken }}"
+        method: GET
+        body_format: json
+        return_content: yes
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      vars:
+        csrftoken: "{{ uricall.x_fhem_csrftoken }}"
+        cmd: "{{ ( \"{Log 1,'ANSIBLE MESSAGE BEFORE UPDATE -- \"+randombase64+\" '}\" ) | urlencode }}"
+      register: fhemcmd
+
+    - debug:
+        msg: "{{ fhemcmd }}"
+
+    ###
+    ### Run update
+    ###
+
+    - name: Fhem call, run update
+      delegate_to: localhost
+      uri:
+        url: "http://{{ ansible_fqdn }}:8083/fhem?cmd=update&XHR=1&fwcsrf={{ csrftoken }}"
+        method: GET
+        body_format: json
+        return_content: yes
+        headers:
+          Accept: "application/json"
+        status_code: 200
+      vars:
+        csrftoken: "{{ uricall.x_fhem_csrftoken }}"
+      register: fhemupdatecmd
+
+    - debug:
+        msg: "{{ fhemupdatecmd }}"
+
+    ###
+    ### Wait
+    ###
+
+    - name: Match "{{ wanted_pattern }}" appearing after "{{ marker_of_logfile }}" in {{ log_file_to_check }}
+      wait_for:
+        path: "{{ log_file_to_check }}"
+        search_regex: "{{ marker_of_logfile }}\r(.*\r)*.*{{ wanted_pattern }}"
+      vars:
+        #wanted_pattern: "update finished, (?P<info>.*)"
+        wanted_pattern: "(nothing to do|update finished, (?P<info>.*))"
+        marker_of_logfile: "{{ 'ANSIBLE MESSAGE BEFORE UPDATE -- ' + randombase64 + ' ' }}"
+        log_file_to_check: "/var/log/fhem/master.log"
+      register: fhemlogwaitfor
+
+    - debug:
+        var: fhemlogwaitfor
+
+    - debug:
+        msg: "Neustart erforderlich"
+      when: fhemlogwaitfor.match_groupdict.info == '"shutdown restart" is needed to activate the changes.'
+
+    - name: restart Fhem
+      service:
+        name: fhem
+        state: restarted
+      when: fhemlogwaitfor.match_groupdict.info == '"shutdown restart" is needed to activate the changes.'
