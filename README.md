@@ -15,3 +15,8 @@ run restore from Proxmox backup server on host B,
 start LXC container on host B.
 
 Remove LXC container manually on host A when everything's fine.
+
+
+## proxmox-start-all-lxcs.yml
+
+Start all LXCs on the specified target Proxmox host

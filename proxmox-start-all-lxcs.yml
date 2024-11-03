@@ -1,0 +1,34 @@
+- hosts: "{{ target }}"
+  tasks:
+    - name: List containers
+      command: "pvesh ls /nodes/{{ ansible_hostname }}/lxc --output-format json"
+      register: lxcjson
+      changed_when: false
+    - set_fact:
+        lxc_id_list: "{{ lxcjson.stdout | from_json | json_query(idquery) }}"
+      vars:
+        idquery: "[].name"
+    - debug:
+        msg: "{{ lxc_id_list }}"
+
+    - name: Get status
+      command: "pvesh get /nodes/{{ ansible_hostname }}/lxc/{{ item }}/status/current --output-format json"
+      loop: "{{ lxc_id_list }}"
+      register: lxcstatusjson
+    - name: Empty list
+      set_fact:
+        lxc_status_list: []
+    - set_fact:
+        lxc_status_list: "{{ lxc_status_list +
+                             [ item.stdout | from_json ]
+                          }}"
+      loop: "{{ lxcstatusjson.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+    - debug:
+        msg: "{{ lxc_status_list }}"
+
+    - name: Start LXC
+      command: "pct start {{ item.vmid }}"
+      loop: "{{ lxc_status_list }}"
+      when: "item.status != 'running'"
