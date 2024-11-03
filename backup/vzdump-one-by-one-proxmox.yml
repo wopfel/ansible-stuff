@@ -68,6 +68,7 @@
       loop: "{{ vzdumpoutput.results }}"
       loop_control:
         label: "{{ item.item }}"
+
     - name: MQTT publish last stdout line
       mqtt:
         topic: 'backup/vzdump/{{ansible_hostname}}/{{item.item}}/last_stdout_line'
@@ -78,6 +79,30 @@
       loop: "{{ vzdumpoutput.results }}"
       loop_control:
         label: "{{ item.item }}"
+
+    # Should be: INFO: Backup finished at 2024-07-22 20:26:51
+    - name: MQTT publish 3rd last stdout line
+      mqtt:
+        topic: 'backup/vzdump/{{ansible_hostname}}/{{item.item}}/3rd_last_stdout_line'
+        payload: '{{ item.stdout_lines[-3]  }}'
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+      loop: "{{ vzdumpoutput.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: MQTT publish backup finished timestamp
+      mqtt:
+        topic: 'backup/vzdump/{{ansible_hostname}}/{{item.item}}/{{destinationstore}}/backup_finished_at'
+        payload: "{{ item.stdout_lines | select('match', 'INFO: Backup finished at.*') }}"
+        server: mosquitto.lan
+        retain: yes
+      delegate_to: localhost
+      loop: "{{ vzdumpoutput.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
     - name: MQTT publish last returncode
       mqtt:
         topic: 'backup/vzdump/{{ansible_hostname}}/{{item.item}}/last_returncode'
@@ -89,3 +114,6 @@
       loop_control:
         label: "{{ item.item }}"
 
+    # Done. "MQTT publish backup finished timestamp"
+    # TODO: get timestamp, publish as .../last_success
+    # "INFO: Backup finished at 2024-06-29 16:05:41", "INFO: Backup job finished successfully"
